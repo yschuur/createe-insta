@@ -8,11 +8,11 @@ Supabase Edge Function voor OpenAI en officiële Meta-API-aanvragen.
 
 De frontend is gebouwd. De workflow kan lokaal worden gestart en met gemockte
 providers worden getest. **De live integratie is nog niet geverifieerd**: de
-kolommen zijn op basis van de aangeleverde CSV verwerkt, maar constraints en policies zijn nog niet gecontroleerd en toegang tot het project vanuit
+kolommen, constraints en policies zijn op basis van de aangeleverde CSV-bestanden gecontroleerd en de adapter is aangepast en toegang tot het project vanuit
 de cloudomgeving werd door de proxy geweigerd. Er zijn geen bestaande tabellen
 aangemaakt of gewijzigd, geen functies gedeployed en geen secrets opgeslagen.
 
-De backend is aangepast aan de bestaande kolommen. Constraints, policies en defaults moeten nog worden gecontroleerd met `supabase/schema/check-access.sql`. Voer niet blind een nieuwe basismigratie uit.
+De backend is aangepast aan de bestaande kolommen. De aangeleverde constraints, policies en defaults zijn verwerkt; live tests met echte accounts staan nog open. Voer niet blind een nieuwe basismigratie uit.
 Zie [het contract](supabase/schema/CONTRACT.md).
 
 ## Lokaal starten
@@ -183,3 +183,20 @@ opnieuw na toepassing. Credentials voor gehoste functies blijven in Supabase.
 
 Deze stappen zijn niet als geslaagd aangemerkt. Er is geen automatische publicatie,
 geen databasewijziging en geen deployment uitgevoerd.
+
+## Inspectieresultaat en volgende configuratiestap
+
+De schema- en toegangsregels zijn aangeleverd en statisch gecontroleerd. De echte
+database gebruikt `posted` voor handmatig geplaatste reacties. De adapter vertaalt
+dit naar de UI-status zonder de bestaande CHECK constraint te veranderen.
+
+Er is een uitsluitend aanvullende OAuth-opslagmigratie voorbereid in
+`supabase/migrations/20261030103000_createe_oauth_storage.sql`. Deze is niet
+uitgevoerd. Installeer de twee nieuwe server-only tabellen pas na controle op
+bestaande gelijknamige tabellen/vault-integraties. Deploy vervolgens de volledige
+`agent`-functie inclusief schema.ts en validation.ts. Een Vercel-deployment
+publiceert deze Supabase-functie niet automatisch.
+
+Voor de volgende stap is de echte Vercel-URL nodig als APP_URL. Daarna moeten de
+servergeheimen in Supabase worden ingevuld. Geen geheimen horen in chat, GitHub of
+Vercel-variabelen met VITE_-prefix. Roteer de eerder gedeelde Meta-secret.

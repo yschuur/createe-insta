@@ -1,0 +1,620 @@
+[
+  {
+    "section": "constraint",
+    "table_name": "agent_settings",
+    "name": "agent_settings_default_humor_level_check",
+    "details": "CHECK (((default_humor_level >= 0) AND (default_humor_level <= 100)))"
+  },
+  {
+    "section": "constraint",
+    "table_name": "agent_settings",
+    "name": "agent_settings_minimum_relevance_score_check",
+    "details": "CHECK (((minimum_relevance_score >= 0) AND (minimum_relevance_score <= 100)))"
+  },
+  {
+    "section": "constraint",
+    "table_name": "agent_settings",
+    "name": "agent_settings_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "agent_settings",
+    "name": "agent_settings_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "agent_settings",
+    "name": "agent_settings_user_id_key",
+    "details": "UNIQUE (user_id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "categories",
+    "name": "categories_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "categories",
+    "name": "categories_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "categories",
+    "name": "categories_user_id_name_key",
+    "details": "UNIQUE (user_id, name)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "comment_drafts",
+    "name": "comment_drafts_humor_level_check",
+    "details": "CHECK (((humor_level >= 0) AND (humor_level <= 100)))"
+  },
+  {
+    "section": "constraint",
+    "table_name": "comment_drafts",
+    "name": "comment_drafts_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "comment_drafts",
+    "name": "comment_drafts_post_id_user_id_fkey",
+    "details": "FOREIGN KEY (post_id, user_id) REFERENCES instagram_posts(id, user_id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "comment_drafts",
+    "name": "comment_drafts_status_check",
+    "details": "CHECK ((status = ANY (ARRAY['draft'::text, 'approved'::text, 'posted'::text, 'rejected'::text])))"
+  },
+  {
+    "section": "constraint",
+    "table_name": "comment_drafts",
+    "name": "comment_drafts_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_connections",
+    "name": "instagram_connections_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_connections",
+    "name": "instagram_connections_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_connections",
+    "name": "instagram_connections_user_id_instagram_account_id_key",
+    "details": "UNIQUE (user_id, instagram_account_id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_posts",
+    "name": "instagram_posts_category_id_fkey",
+    "details": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_posts",
+    "name": "instagram_posts_id_user_id_key",
+    "details": "UNIQUE (id, user_id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_posts",
+    "name": "instagram_posts_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_posts",
+    "name": "instagram_posts_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "instagram_posts",
+    "name": "instagram_posts_user_id_permalink_key",
+    "details": "UNIQUE (user_id, permalink)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "post_analyses",
+    "name": "post_analyses_pkey",
+    "details": "PRIMARY KEY (id)"
+  },
+  {
+    "section": "constraint",
+    "table_name": "post_analyses",
+    "name": "post_analyses_post_id_user_id_fkey",
+    "details": "FOREIGN KEY (post_id, user_id) REFERENCES instagram_posts(id, user_id) ON DELETE CASCADE"
+  },
+  {
+    "section": "constraint",
+    "table_name": "post_analyses",
+    "name": "post_analyses_relevance_score_check",
+    "details": "CHECK (((relevance_score >= 0) AND (relevance_score <= 100)))"
+  },
+  {
+    "section": "constraint",
+    "table_name": "post_analyses",
+    "name": "post_analyses_user_id_fkey",
+    "details": "FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "default_humor_level",
+    "details": "60"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "max_post_age_hours",
+    "details": "24"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "max_results",
+    "details": "25"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "minimum_relevance_score",
+    "details": "60"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "preferred_language",
+    "details": "'auto'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "updated_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "agent_settings",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "created_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "enabled",
+    "details": "true"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "hashtags",
+    "details": "'{}'::text[]"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "name",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "target_accounts",
+    "details": "'{}'::text[]"
+  },
+  {
+    "section": "default",
+    "table_name": "categories",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "created_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "edited_text",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "generated_text",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "humor_level",
+    "details": "60"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "humor_type",
+    "details": "'playful'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "language",
+    "details": "'auto'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "post_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "status",
+    "details": "'draft'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "updated_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "comment_drafts",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "created_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "instagram_account_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "profile_picture_url",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "token_expires_at",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "token_secret_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_connections",
+    "name": "username",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "caption",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "category_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "discovered_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "instagram_post_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "media_type",
+    "details": "'UNKNOWN'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "media_url",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "permalink",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "published_at",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "source",
+    "details": "'manual'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "status",
+    "details": "'new'::text"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "thumbnail_url",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "instagram_posts",
+    "name": "username",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "analysis_limitations",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "analysis_sources",
+    "details": "'{}'::text[]"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "created_at",
+    "details": "now()"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "detected_topic",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "humorous_angles",
+    "details": "'[]'::jsonb"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "id",
+    "details": "gen_random_uuid()"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "post_id",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "relevance_score",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "summary",
+    "details": "(none)"
+  },
+  {
+    "section": "default",
+    "table_name": "post_analyses",
+    "name": "user_id",
+    "details": "(none)"
+  },
+  {
+    "section": "policy",
+    "table_name": "agent_settings",
+    "name": "Delete own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"DELETE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "agent_settings",
+    "name": "Insert own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"INSERT\", \"using\" : null, \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "agent_settings",
+    "name": "Read own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"SELECT\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "agent_settings",
+    "name": "Update own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"UPDATE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "categories",
+    "name": "Delete own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"DELETE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "categories",
+    "name": "Insert own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"INSERT\", \"using\" : null, \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "categories",
+    "name": "Read own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"SELECT\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "categories",
+    "name": "Update own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"UPDATE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "comment_drafts",
+    "name": "Delete own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"DELETE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "comment_drafts",
+    "name": "Insert own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"INSERT\", \"using\" : null, \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "comment_drafts",
+    "name": "Read own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"SELECT\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "comment_drafts",
+    "name": "Update own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"UPDATE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "instagram_posts",
+    "name": "Delete own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"DELETE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "instagram_posts",
+    "name": "Insert own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"INSERT\", \"using\" : null, \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "instagram_posts",
+    "name": "Read own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"SELECT\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "instagram_posts",
+    "name": "Update own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"UPDATE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "post_analyses",
+    "name": "Delete own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"DELETE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "post_analyses",
+    "name": "Insert own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"INSERT\", \"using\" : null, \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  },
+  {
+    "section": "policy",
+    "table_name": "post_analyses",
+    "name": "Read own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"SELECT\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : null}"
+  },
+  {
+    "section": "policy",
+    "table_name": "post_analyses",
+    "name": "Update own",
+    "details": "{\"roles\" : [\"authenticated\"], \"command\" : \"UPDATE\", \"using\" : \"(( SELECT auth.uid() AS uid) = user_id)\", \"check\" : \"(( SELECT auth.uid() AS uid) = user_id)\"}"
+  }
+]

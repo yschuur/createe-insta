@@ -1,11 +1,35 @@
+export function draftStatusToDb(status: string) {
+  if (!["draft", "approved", "published"].includes(status))
+    throw new Error("Ongeldige reactiestatus.");
+  return status === "published" ? "posted" : status;
+}
+const styles: Record<string, string> = {
+  playful: "Speels",
+  sarcastic: "Sarcastisch",
+  pun: "Woordgrap",
+};
+export function humorToDb(style: string) {
+  return (
+    (
+      {
+        Speels: "playful",
+        Sarcastisch: "sarcastic",
+        Woordgrap: "pun",
+      } as Record<string, string>
+    )[style] || style
+  );
+}
+export function languageToDb(language: string) {
+  return language === "Engels" ? "en" : "nl";
+}
 // Maps the existing schema supplied in the user's CSV to the browser contract.
 export function draftView(row: any) {
   return {
     id: row.id,
     post_id: row.post_id,
     text: row.edited_text ?? row.generated_text,
-    style: row.humor_type,
-    status: row.status,
+    style: styles[row.humor_type] || row.humor_type,
+    status: row.status === "posted" ? "published" : row.status,
   };
 }
 export function postView(
@@ -29,7 +53,9 @@ export function settingsView(row: any, categories: any[]) {
   return {
     editor: {
       humor: row?.default_humor_level ?? 65,
-      language: row?.preferred_language ?? "Nederlands",
+      language: ["en", "Engels"].includes(row?.preferred_language)
+        ? "Engels"
+        : "Nederlands",
       style: "Alle drie",
       length: "Kort",
       instructions: "",

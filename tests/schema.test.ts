@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   analysisRecord,
+  draftStatusToDb,
+  humorToDb,
+  languageToDb,
   draftView,
   postView,
   settingsView,
@@ -82,4 +85,49 @@ describe("adapter for user-supplied Supabase column export", () => {
       analysis_sources: ["caption"],
       analysis_limitations: "Alleen caption; geen beeld of video bekeken.",
     }));
+});
+
+describe("compatibility with inspected status constraints and defaults", () => {
+  it("maps publication both ways using the real allowed database value", () => {
+    const entries = JSON.parse(
+      readFileSync(
+        new URL("./fixtures/supabase-access.json", import.meta.url),
+        "utf8",
+      ),
+    );
+    const constraint = entries.find(
+      (r: any) => r.name === "comment_drafts_status_check",
+    ).details;
+    const allowed = Array.from(
+      constraint.matchAll(/'([^']+)'::text/g),
+      (m: any) => m[1],
+    );
+    for (const status of ["draft", "approved", "published"])
+      expect(allowed).toContain(draftStatusToDb(status));
+    expect(draftStatusToDb("published")).toBe("posted");
+    expect(() => draftStatusToDb("invalid")).toThrow();
+    expect(
+      draftView({ status: "posted", humor_type: "playful" }),
+    ).toMatchObject({ status: "published", style: "Speels" });
+  });
+  it("normalizes existing auto/nl/en preferences to valid editor choices", () => {
+    expect(
+      settingsView({ preferred_language: "auto" }, []).editor.language,
+    ).toBe("Nederlands");
+    expect(settingsView({ preferred_language: "en" }, []).editor.language).toBe(
+      "Engels",
+    );
+    expect(languageToDb("Nederlands")).toBe("nl");
+    expect(languageToDb("Engels")).toBe("en");
+  });
+  it("preserves canonical humor values on writes and readable labels on reads", () => {
+    for (const [label, key] of [
+      ["Speels", "playful"],
+      ["Sarcastisch", "sarcastic"],
+      ["Woordgrap", "pun"],
+    ]) {
+      expect(humorToDb(label)).toBe(key);
+      expect(draftView({ humor_type: key }).style).toBe(label);
+    }
+  });
 });

@@ -1,4 +1,12 @@
-import { draftView, postView, settingsView, analysisRecord } from "./schema.ts";
+import {
+  draftView,
+  postView,
+  settingsView,
+  analysisRecord,
+  draftStatusToDb,
+  humorToDb,
+  languageToDb,
+} from "./schema.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   categoryTags,
@@ -540,7 +548,7 @@ Deno.serve(async (req: Request) => {
             discovered_at: new Date().toISOString(),
             source: "manual",
             media_type: permalink.includes("/reel/") ? "VIDEO" : "IMAGE",
-            status: "discovered",
+            status: "new",
           })
           .select()
           .single(),
@@ -559,7 +567,7 @@ Deno.serve(async (req: Request) => {
       );
       const values = {
         default_humor_level: body.settings.editor.humor,
-        preferred_language: body.settings.editor.language,
+        preferred_language: languageToDb(body.settings.editor.language),
         updated_at: new Date().toISOString(),
       };
       if (current)
@@ -616,7 +624,7 @@ Deno.serve(async (req: Request) => {
           .from("comment_drafts")
           .update({
             edited_text: body.text,
-            status: body.status,
+            status: draftStatusToDb(body.status),
             updated_at: new Date().toISOString(),
           })
           .eq("user_id", userId)
@@ -672,8 +680,8 @@ Deno.serve(async (req: Request) => {
                   generated_text: c.text,
                   edited_text: null,
                   humor_level: settings.humor,
-                  humor_type: c.style,
-                  language: settings.language,
+                  humor_type: humorToDb(c.style),
+                  language: languageToDb(settings.language),
                   created_at: new Date().toISOString(),
                   updated_at: new Date().toISOString(),
                   status: "draft",
@@ -773,7 +781,7 @@ Deno.serve(async (req: Request) => {
                 instagram_post_id: p.id,
                 published_at: p.timestamp,
                 discovered_at: new Date().toISOString(),
-                status: "discovered",
+                status: "new",
                 media_type: p.media_type,
                 media_url: firstPhoto?.media_url || p.media_url || null,
                 source: "meta",

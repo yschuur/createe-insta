@@ -21,41 +21,48 @@ matching account columns in the supplied schema. Every generated draft retains
 its own humor settings and language. Uploaded images are sent for analysis, not
 persisted as media in the database.
 
-## Remaining verification before live deployment
+## Constraints and policies inspected
 
-Run `check-access.sql` in SQL Editor and export its single result table as CSV.
-It reads only constraint definitions, policies and column defaults. It reads no
-application data or secrets. Column types alone do not reveal allowed status,
-humor_type, source or language values, defaults, unique keys or policy behavior.
+The user's second export is retained in `tests/fixtures/supabase-access.json`.
+The comment status constraint permits draft/approved/posted/rejected. The adapter
+translates the UI's published status to posted on writes and back on reads.
+Humor values use playful/sarcastic/pun; language values use nl/en. Existing auto
+preferences fall back to Nederlands in this MVP's two-language editor. No existing
+rows or defaults are changed. New posts use the existing default status new.
 
-Current writes use draft/approved/published for comments, discovered for posts,
-manual/meta for sources, Speels/Sarcastisch/Woordgrap for humor type and
-Nederlands/Engels for language. Check these against actual constraints before
-using live writes. Never remove a constraint just to make an insert pass.
+The supplied policies scope SELECT/INSERT/UPDATE/DELETE to auth.uid() = user_id
+for settings, categories, posts, analyses and drafts, including WITH CHECK for
+inserts/updates. Composite foreign keys bind drafts and analyses to posts of the
+same user. instagram_connections has no policies in the export; with RLS enabled
+it remains inaccessible to ordinary clients, while the verified Edge Function
+uses the service role. Live tests with two accounts are still required; a static
+policy review does not verify live grants, extensions or runtime behavior.
 
-User-keyed settings and connections explicitly look up existing IDs before
-updates, without assuming unique(user_id). Category resolution is also scoped to
-the user. Duplicate existing rows trigger an error. Check actual uniqueness before
-production concurrency; select-then-insert does not itself prevent races.
+Unique constraints exist for settings(user_id), categories(user_id,name),
+posts(user_id,permalink) and connections(user_id,instagram_account_id).
+Connections may contain multiple accounts; the current MVP refuses to replace an
+ambiguous set. Select-then-insert flows can still encounter uniqueness conflicts
+under concurrent requests and report them rather than overwrite another record.
 
-Every request verifies JWT identity and every query is scoped to that user.
-Existing public API access still needs correct RLS USING and WITH CHECK policies.
-Ensure a draft or analysis cannot reference another user's post. RLS being enabled
-alone does not demonstrate correct authorization.
+The category foreign key covers category_id only, not category_id/user_id.
+Backend category reads and writes verify ownership. Direct database clients need
+an additional ownership-preserving category constraint before production writes
+are opened broadly; do not replace existing constraints without auditing data.
 
 ## OAuth storage is still pending
 
-The existing token_secret_id UUID column may reference an existing vault; inspect
-its foreign key before deciding how tokens should be stored. No secrets have
-been read. The current code still expects two additional server-only tables:
+The inspected token_secret_id UUID column has no foreign key in the export. No
+secrets have been read. The current code uses independent encrypted storage and
+does not modify existing token_secret_id values. A migration has been prepared at
+`supabase/migrations/20261030103000_createe_oauth_storage.sql` for these new tables:
 
 - createe_oauth_states(state_hash text primary key, user_id uuid, expires_at timestamptz)
 - createe_token_vault(user_id uuid primary key, encrypted_token text, instagram_user_id text, expires_at timestamptz)
 
-These have NOT been created. Do not provision redundant token storage until the
-existing constraints/vault integration are understood. If this storage is used,
-enable RLS, deny anon/authenticated access and grant only service_role, with
-foreign keys to auth.users. Tokens are AES-256-GCM encrypted by the function;
+These have NOT been created. The prepared migration is transactional, fails on
+name conflicts and changes no existing tables. It enables RLS, denies public,
+anon and authenticated access, grants only service_role access and adds foreign
+keys to auth.users. Review any pre-existing vault integration before applying. Tokens are AES-256-GCM encrypted by the function;
 OAuth state is hashed, expiring and atomically consumed. OAuth remains blocked
 until storage is securely configured.
 
