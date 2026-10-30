@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "CREATEE Browserpilot",
+  "version": "0.1.0",
+  "description": "Lokale pilot: plaats één expliciet goedgekeurde CREATEE-reactie in je eigen Instagram-browser.",
+  "permissions": ["storage", "tabs", "scripting"],
+  "host_permissions": ["https://www.instagram.com/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html" }
+}

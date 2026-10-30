@@ -44,6 +44,9 @@ export function postView(
     category:
       categories.find((c) => c.id === row.category_id)?.name ?? "Onbekend",
     timestamp: row.published_at,
+    like_count: row.discovery_metadata?.like_count ?? null,
+    comments_count: row.discovery_metadata?.comments_count ?? null,
+    detected_language: analysis?.detected_language ?? "unknown",
     relevance: analysis?.relevance_score ?? 0,
     analysis: analysis?.summary ?? undefined,
     drafts: drafts.filter((d) => d.post_id === row.id).map(draftView),
@@ -76,6 +79,7 @@ export function analysisRecord(
     user_id: userId,
     post_id: postId,
     summary: data.analysis,
+    detected_language: data.language || "unknown",
     detected_topic: null,
     relevance_score: data.relevance,
     humorous_angles: [],

@@ -1,4 +1,12 @@
-import { useEffect, useState } from "react";
+import DiscoveryFilters from "./components/DiscoveryFilters";
+import {
+  defaultFilters,
+  parseFilters,
+  filterPosts,
+  hashtagsFor,
+  type FilterOptions,
+} from "../supabase/functions/agent/discovery";
+import { useEffect, useState, useRef } from "react";
 import type { Session } from "@supabase/supabase-js";
 import {
   LayoutDashboard,
@@ -13,7 +21,6 @@ import {
   Check,
   LogOut,
   Search,
-  SlidersHorizontal,
   ArrowRight,
   Menu,
   RefreshCw,
@@ -39,15 +46,46 @@ const nav = [
 export default function App() {
   const [session, setSession] = useState<Session | null>(null),
     [authReady, setAuthReady] = useState(!supabase);
+  const activeUser = useRef(session?.user.id);
+  activeUser.current = session?.user.id;
   const [page, setPage] = useState("Overzicht"),
     [posts, setPosts] = useState<Post[]>([]),
     [selected, setSelected] = useState<Post | null>(null);
   const [settings, setSettings] = useState<Settings>(defaults),
     [enabled, setEnabled] = useState(categories),
     [category, setCategory] = useState("Alle categorieën");
-  const [since, setSince] = useState(""),
-    [query, setQuery] = useState(""),
-    [minRelevance, setMinRelevance] = useState(0);
+  const [query, setQuery] = useState("");
+  const [filters, setFilters] = useState<FilterOptions>(
+    structuredClone(defaultFilters),
+  );
+  const [filterOwner, setFilterOwner] = useState("");
+  const [progress, setProgress] = useState("");
+  useEffect(() => {
+    const id = session?.user.id || "";
+    setFilterOwner(id);
+    try {
+      setFilters(
+        parseFilters(
+          id
+            ? JSON.parse(
+                localStorage.getItem("createe-filters:" + id) || "null",
+              )
+            : null,
+        ),
+      );
+    } catch {
+      setFilters(structuredClone(defaultFilters));
+    }
+  }, [session?.user.id]);
+  useEffect(() => {
+    if (filterOwner && filterOwner === session?.user.id)
+      try {
+        localStorage.setItem(
+          "createe-filters:" + filterOwner,
+          JSON.stringify(filters),
+        );
+      } catch {}
+  }, [filters, filterOwner, session?.user.id]);
   const [link, setLink] = useState(""),
     [caption, setCaption] = useState(""),
     [manualCategory, setManualCategory] = useState("Golf");
@@ -71,7 +109,9 @@ export default function App() {
     }
   };
   async function load() {
+    const owner = session?.user.id;
     const data = await api("list");
+    if (owner !== activeUser.current) return;
     setPosts(data.posts);
     setConnected(data.connected);
     if (data.settings) {
@@ -91,6 +131,9 @@ export default function App() {
     return () => data.subscription.unsubscribe();
   }, []);
   useEffect(() => {
+    setPosts([]);
+    setSelected(null);
+    setConnected(false);
     if (session) void run(load);
   }, [session?.user.id]);
   useEffect(() => {
@@ -105,13 +148,77 @@ export default function App() {
     }
   }, []);
   const counts = stats(posts);
-  const filtered = posts.filter(
+  const filtered = filterPosts(posts, filters).filter(
     (p) =>
       (category === "Alle categorieën" || p.category === category) &&
-      (!since || (!!p.timestamp && p.timestamp >= since)) &&
-      (p.relevance || 0) >= minRelevance &&
-      p.caption.toLowerCase().includes(query.toLowerCase()),
+      (p.caption || "").toLowerCase().includes(query.toLowerCase()),
   );
+  const targetCategories = filters.categories.on
+    ? filters.categories.values
+    : category !== "Alle categorieën"
+      ? [category]
+      : enabled;
+  async function discover() {
+    const owner = session?.user.id;
+    const valid = parseFilters(filters);
+    const tags = valid.hashtags.on ? hashtagsFor(valid, "") : null;
+    if (tags && !tags.length)
+      throw new Error(
+        "Vul minstens één hashtag in of zet het hashtagfilter uit.",
+      );
+    const jobs = tags
+      ? tags.map((tag) => ({ category: targetCategories[0], hashtag: tag }))
+      : targetCategories.map((category) => ({ category, hashtag: undefined }));
+    if (!jobs.length || !jobs[0].category)
+      throw new Error("Selecteer minstens één categorie.");
+    let imported = 0;
+    const warnings: string[] = [];
+    try {
+      for (let i = 0; i < jobs.length; i++) {
+        if (owner !== activeUser.current) break;
+        const job = jobs[i];
+        setProgress(
+          `Ophalen ${i + 1}/${jobs.length}: ${job.hashtag || job.category}…`,
+        );
+        try {
+          const data = await api("discover", {
+            categories: [job.category],
+            hashtag: job.hashtag,
+            filters: valid,
+          });
+          imported += data.imported;
+        } catch (e) {
+          warnings.push(
+            `${job.hashtag || job.category}: ${e instanceof Error ? e.message : "Aanvraag mislukt"}`,
+          );
+        }
+        await load();
+      }
+    } finally {
+      setProgress("");
+    }
+    setNotice(
+      `${imported} nieuwe posts opgeslagen. ${warnings.length ? `${warnings.length} aanvraag/aanvragen mislukt: ${warnings.join(" | ")}. Eerder opgeslagen resultaten blijven bewaard.` : "Ophalen afgerond."}${valid.hashtags.on ? " Eigen hashtags worden onder de eerste geselecteerde categorie opgeslagen." : ""}`,
+    );
+  }
+  async function copyAndOpen(d: Draft, permalink: string) {
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
+    try {
+      await navigator.clipboard.writeText(d.text);
+      if (popup) popup.location.href = permalink;
+      setNotice(
+        popup
+          ? "Gekopieerd en Instagram geopend. Plak en plaats de reactie daar zelf."
+          : "Gekopieerd. Je browser blokkeert het nieuwe venster; gebruik de Instagram-link.",
+      );
+    } catch {
+      popup?.close();
+      throw new Error(
+        "Kopiëren geblokkeerd door de browser. Kopieer de tekst handmatig en gebruik de Instagram-link.",
+      );
+    }
+  }
   function openStudio(p: Post) {
     setSelected(p);
     setPage("Reactiestudio");
@@ -139,6 +246,20 @@ export default function App() {
       status === "published"
         ? "Handmatige publicatie geregistreerd."
         : "Reactie opgeslagen.",
+    );
+  }
+  async function exportBrowserDraft(d: Draft) {
+    const data = await api("browserDraft", { id: d.id });
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `createe-approved-${d.id}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice(
+      "Goedgekeurde reactie geëxporteerd voor de lokale Chrome-browserpilot. Dit plaatst nog niets. De pilot is geen officiële Meta-integratie en moet eerst in jouw browser worden getest.",
     );
   }
   const disabled = busy || !session;
@@ -473,19 +594,8 @@ export default function App() {
                 </div>
                 <Button
                   variant="outline"
-                  disabled={disabled || !connected || !enabled.length}
-                  onClick={() =>
-                    void run(async () => {
-                      const data = await api("discover", {
-                        categories: enabled,
-                        since,
-                      });
-                      await load();
-                      setNotice(
-                        `${data.imported} posts opgeslagen via officiële hashtagdetectie.`,
-                      );
-                    })
-                  }
+                  disabled={disabled || !connected || !targetCategories.length}
+                  onClick={() => void run(discover)}
                 >
                   <RefreshCw size={15} /> Posts ontdekken
                 </Button>
@@ -512,27 +622,18 @@ export default function App() {
                       onChange={(e) => setQuery(e.target.value)}
                     />
                   </label>
-                  <label>
-                    Vanaf
-                    <input
-                      type="date"
-                      value={since}
-                      onChange={(e) => setSince(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <SlidersHorizontal size={15} /> Relevantie
-                    <select
-                      value={minRelevance}
-                      onChange={(e) => setMinRelevance(+e.target.value)}
-                    >
-                      <option value={0}>Alles</option>
-                      <option value={50}>50%+</option>
-                      <option value={75}>75%+</option>
-                    </select>
-                  </label>
                 </div>
               </div>
+              <DiscoveryFilters
+                value={filters}
+                onChange={setFilters}
+                disabled={busy}
+              />
+              {progress && (
+                <p role="status" className="discovery-progress">
+                  {progress}
+                </p>
+              )}
               {filtered.length ? (
                 <div className="posts-grid">
                   {filtered.map((p) => (
@@ -796,6 +897,28 @@ export default function App() {
                         >
                           <Check size={14} /> Goedkeuren
                         </Button>
+                        {d.status === "approved" && (
+                          <Button
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => exportBrowserDraft(d))
+                            }
+                          >
+                            Browserpilot exporteren
+                          </Button>
+                        )}
+                        {d.status === "approved" && (
+                          <Button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => copyAndOpen(d, selected.permalink))
+                            }
+                          >
+                            Kopiëren en openen op Instagram{" "}
+                            <ArrowUpRight size={14} />
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           disabled={!d.text.trim()}

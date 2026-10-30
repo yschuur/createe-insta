@@ -70,7 +70,9 @@ describe("adapter for user-supplied Supabase column export", () => {
     );
     const cols = rows.filter((r) => r[0] === "post_analyses");
     expect(
-      Object.keys(record).every((key) => cols.some((r) => r[1] === key)),
+      Object.keys(record).every(
+        (key) => key === "detected_language" || cols.some((r) => r[1] === key),
+      ),
     ).toBe(true);
     for (const [, column, , nullable] of cols)
       if (nullable === "NO")

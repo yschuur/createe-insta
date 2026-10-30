@@ -11,7 +11,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test:browser": "playwright test",
     "check:edge": "deno check supabase/functions/agent/index.ts",
-    "format": "prettier --write src supabase/functions tests *.ts *.json README.md"
+    "format": "prettier --write src supabase/functions tests *.ts *.json README.md",
+    "build:edge": "node scripts/build-edge.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

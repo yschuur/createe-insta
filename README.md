@@ -6,14 +6,17 @@ Supabase Edge Function voor OpenAI en officiële Meta-API-aanvragen.
 
 ## Status en grenzen
 
-De frontend is gebouwd. De workflow kan lokaal worden gestart en met gemockte
-providers worden getest. **De live integratie is nog niet geverifieerd**: de
-kolommen, constraints en policies zijn op basis van de aangeleverde CSV-bestanden gecontroleerd en de adapter is aangepast en toegang tot het project vanuit
-de cloudomgeving werd door de proxy geweigerd. Er zijn geen bestaande tabellen
-aangemaakt of gewijzigd, geen functies gedeployed en geen secrets opgeslagen.
+React-interface, Supabase-serverfunctie en de schakelbare discoveryfilters zijn
+gebouwd. De bestaande databasekolommen, constraints en RLS-policies zijn verwerkt.
+Build, unit-/workflowtests en broncode-typecontrole kunnen lokaal worden uitgevoerd.
+De nieuwste update moet nog worden geactiveerd in Supabase en live worden getest;
+zie [update-instructies](docs/UPDATE-FILTERS.md).
 
-De backend is aangepast aan de bestaande kolommen. De aangeleverde constraints, policies en defaults zijn verwerkt; live tests met echte accounts staan nog open. Voer niet blind een nieuwe basismigratie uit.
-Zie [het contract](supabase/schema/CONTRACT.md).
+De optionele Chrome-browserpilot is geen officiële Meta-integratie en is niet
+bevestigd op het echte Instagram-account. Plaatsingslogica is getest op expliciete
+HTML-fixtures en de popup met een gemockte Chrome-API. Extensie-installatie wordt
+in deze cloudomgeving geblokkeerd door beheerd browserbeleid; die test is als
+skipped gerapporteerd. Er zijn vanuit deze cloudtaak geen live reacties geplaatst.
 
 ## Lokaal starten
 
@@ -200,3 +203,15 @@ publiceert deze Supabase-functie niet automatisch.
 Voor de volgende stap is de echte Vercel-URL nodig als APP_URL. Daarna moeten de
 servergeheimen in Supabase worden ingevuld. Geen geheimen horen in chat, GitHub of
 Vercel-variabelen met VITE_-prefix. Roteer de eerder gedeelde Meta-secret.
+
+## Nieuwe filters en browserpilot
+
+Zie [filters activeren](docs/UPDATE-FILTERS.md) voor de ene aanvullende SQL-migratie
+en de vereenvoudigde single-file Edge-deployment. Maak die met `npm run build:edge`;
+de oorspronkelijke TypeScript-types blijven behouden en het exacte deploybestand
+wordt met Deno gecontroleerd. De schakelbare filters starten geen extra AI-aanvragen.
+
+Op expliciet verzoek is ook een [lokale browserpilot](docs/BROWSERPILOT.md) gebouwd
+voor één goedgekeurde reactie per startactie. Dit is geen officiële Meta-route,
+geen onbeheerde autoposter en niet live tegen het CREATEE-account gevalideerd.
+Chrome-installatie en controle van iedere echte uitkomst blijven nodig.

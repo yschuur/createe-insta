@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <title>CREATEE Browserpilot</title>
+    <style>
+      body {
+        font: 13px system-ui;
+        width: 330px;
+        padding: 18px;
+        color: #263e30;
+      }
+      h1 {
+        font-size: 19px;
+      }
+      p {
+        line-height: 1.6;
+      }
+      textarea {
+        width: 100%;
+        min-height: 90px;
+        box-sizing: border-box;
+      }
+      button {
+        background: #263e30;
+        color: #fff;
+        border: 0;
+        border-radius: 6px;
+        padding: 12px;
+        width: 100%;
+        margin-top: 12px;
+      }
+      button:disabled {
+        opacity: 0.4;
+      }
+      label {
+        display: block;
+        margin-top: 14px;
+      }
+      #result {
+        white-space: pre-wrap;
+      }
+      small {
+        color: #687660;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CREATEE Browserpilot</h1>
+    <p>
+      Lokale proefversie. Instagram kan deze automatisering beperken. Geen
+      batchmodus; controleer iedere reactie.
+    </p>
+    <label
+      >Goedgekeurde reactie uit CREATEE<input
+        id="file"
+        type="file"
+        accept="application/json,.json"
+    /></label>
+    <p id="account"></p>
+    <textarea id="preview" readonly aria-label="Goedgekeurde tekst"></textarea
+    ><label
+      ><input id="consent" type="checkbox" />Ik wil deze ene reactie met het
+      getoonde CREATEE-account laten plaatsen.</label
+    ><button id="place" disabled>Plaats deze goedgekeurde reactie</button>
+    <p id="result" role="status"></p>
+    <small
+      >Geen wachtwoord of tokens opgeslagen. Bij onzeker resultaat: zelf
+      controleren, niet opnieuw laten plaatsen. Uitkomst blijft lokaal
+      bewaard.</small
+    >
+    <script src="popup.js"></script>
+  </body>
+</html>

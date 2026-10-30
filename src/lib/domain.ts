@@ -15,6 +15,9 @@ export type Post = {
   thumbnail_url?: string;
   media_type?: string;
   relevance?: number;
+  detected_language?: string;
+  like_count?: number | null;
+  comments_count?: number | null;
   analysis?: string;
   drafts?: Draft[];
 };

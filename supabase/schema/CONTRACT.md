@@ -59,7 +59,7 @@ does not modify existing token_secret_id values. A migration has been prepared a
 - createe_oauth_states(state_hash text primary key, user_id uuid, expires_at timestamptz)
 - createe_token_vault(user_id uuid primary key, encrypted_token text, instagram_user_id text, expires_at timestamptz)
 
-These have NOT been created. The prepared migration is transactional, fails on
+The user reported successfully running this OAuth migration. The cloud agent has not independently queried the resulting tables. The prepared migration is transactional, fails on
 name conflicts and changes no existing tables. It enables RLS, denies public,
 anon and authenticated access, grants only service_role access and adds foreign
 keys to auth.users. Review any pre-existing vault integration before applying. Tokens are AES-256-GCM encrypted by the function;
@@ -70,3 +70,12 @@ Generation currently makes separate writes. A database failure after AI
 completion may leave an analysis without drafts. Add a reviewed transaction RPC
 and per-user quota before public multi-user use. Live integration has not yet
 been validated.
+
+
+## Discovery update
+
+`20261030110000_discovery_filters.sql` adds nullable instagram_posts.discovery_metadata
+and post_analyses.detected_language. This migration has NOT been applied by the
+agent and is required before deploying the new server function. It changes no
+existing data or policies. Language classification uses nl/en/other/unknown; legacy
+analyses remain unknown. Counts are optional Meta observations, never inferred.

@@ -1109,3 +1109,138 @@ footer span {
     font-size: 10px;
   }
 }
+.discovery-filters {
+  background: #fff;
+  border: 1px solid #dce3d4;
+  border-radius: 10px;
+  padding: 18px;
+  margin: 0 0 24px;
+}
+.discovery-filters summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+.discovery-filters summary span {
+  font-size: 11px;
+  color: #71825b;
+  margin-left: 12px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+.filter-card {
+  border: 1px solid #e5eadf;
+  border-radius: 8px;
+  padding: 14px;
+  min-width: 0;
+}
+.filter-switch {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 12px;
+  gap: 10px;
+}
+.filter-switch input {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  background: #d4dbce;
+  position: relative;
+  cursor: pointer;
+}
+.filter-switch input:before {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  background: white;
+  transition: transform 0.15s;
+}
+.filter-switch input:checked {
+  background: #46613b;
+}
+.filter-switch input:checked:before {
+  transform: translateX(14px);
+}
+.filter-card fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.filter-card fieldset:disabled {
+  opacity: 0.42;
+}
+.filter-card label {
+  margin: 9px 0;
+  font-size: 11px;
+}
+.filter-card small {
+  display: block;
+  font-weight: 400;
+  font-size: 10px;
+  color: #7c8975;
+  line-height: 1.6;
+}
+.filter-checks label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+}
+.filter-card p {
+  font-size: 11px;
+}
+.filter-bottom {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+.filter-bottom label {
+  min-width: 180px;
+}
+.filter-help,
+.discovery-progress {
+  font-size: 11px;
+  color: #708262;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+.discovery-progress {
+  margin-bottom: 20px;
+}
+@media (max-width: 1100px) {
+  .filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .filter-grid {
+    grid-template-columns: 1fr;
+  }
+  .filter-bottom {
+    flex-wrap: wrap;
+  }
+  .filter-bottom label {
+    min-width: 0;
+    flex: 1;
+  }
+  .draft-actions > .btn {
+    white-space: normal;
+  }
+}
