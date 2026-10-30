@@ -135,3 +135,97 @@ describe("switchable discovery filters", () => {
       expect(() => parseFilters({ ...fresh(), ...patch })).toThrow();
   });
 });
+
+describe("AI selection before persistence", () => {
+  it("does not run paid AI for candidates rejected by cheap criteria", async () => {
+    const { selectForPlayfield } =
+      await import("../supabase/functions/agent/discovery");
+    let calls = 0;
+    const f = fresh();
+    f.media = { on: true, values: ["VIDEO"] };
+    f.relevance.on = true;
+    const result = await selectForPlayfield(
+      post,
+      f,
+      false,
+      async () => {
+        calls++;
+        return { analysis: "No", relevance: 100, language: "en" };
+      },
+      now,
+    );
+    expect(result.selected).toBe(false);
+    expect(calls).toBe(0);
+  });
+  it("analyzes a new unanalysed candidate and rejects it below the required score", async () => {
+    const { selectForPlayfield } =
+      await import("../supabase/functions/agent/discovery");
+    const f = fresh();
+    f.relevance = { on: true, minimum: 70 };
+    let calls = 0;
+    const result = await selectForPlayfield(
+      { ...post, analysis: null, relevance: undefined },
+      f,
+      false,
+      async () => {
+        calls++;
+        return { analysis: "Not relevant", relevance: 20, language: "en" };
+      },
+      now,
+    );
+    expect(calls).toBe(1);
+    expect(result.selected).toBe(false);
+  });
+  it("selects only candidates matching both AI language and relevance", async () => {
+    const { selectForPlayfield } =
+      await import("../supabase/functions/agent/discovery");
+    const f = fresh();
+    f.language = { on: true, value: "nl" };
+    f.relevance = { on: true, minimum: 70 };
+    expect(
+      (
+        await selectForPlayfield(
+          post,
+          f,
+          false,
+          async () => ({ analysis: "Pass", relevance: 90, language: "nl" }),
+          now,
+        )
+      ).selected,
+    ).toBe(true);
+    expect(
+      (
+        await selectForPlayfield(
+          post,
+          f,
+          false,
+          async () => ({
+            analysis: "Wrong language",
+            relevance: 90,
+            language: "en",
+          }),
+          now,
+        )
+      ).selected,
+    ).toBe(false);
+  });
+  it("does not pay for analysis of handled posts and propagates AI failures instead of accepting", async () => {
+    const { selectForPlayfield } =
+      await import("../supabase/functions/agent/discovery");
+    const f = fresh();
+    f.handled.on = true;
+    f.relevance.on = true;
+    let calls = 0;
+    const analyze = async () => {
+      calls++;
+      throw new Error("AI unavailable");
+    };
+    expect(
+      (await selectForPlayfield(post, f, true, analyze, now)).selected,
+    ).toBe(false);
+    expect(calls).toBe(0);
+    await expect(
+      selectForPlayfield(post, f, false, analyze, now),
+    ).rejects.toThrow("AI unavailable");
+  });
+});

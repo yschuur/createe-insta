@@ -31,7 +31,12 @@ beforeEach(() => {
     data: { session: { user: { id: "u1", email: "studio@example.com" } } },
   });
   mocks.api.mockImplementation(async (action: string) => {
-    if (action === "list") return { posts: [initial], connected: true };
+    if (action === "list")
+      return {
+        posts: [initial],
+        connected: true,
+        capabilities: { playfieldSelection: true },
+      };
     if (action === "generate")
       return {
         analysis: "Alleen caption geanalyseerd.",
@@ -114,7 +119,12 @@ describe("authenticated workflow using an explicit mocked service", () => {
   it("surfaces provider errors and allows retry", async () => {
     const user = userEvent.setup();
     mocks.api.mockImplementation(async (action: string) => {
-      if (action === "list") return { posts: [initial], connected: true };
+      if (action === "list")
+        return {
+          posts: [initial],
+          connected: true,
+          capabilities: { playfieldSelection: true },
+        };
       throw new Error("OpenAI quotum bereikt");
     });
     render(<App />);
@@ -141,6 +151,12 @@ describe("discovery filters and partial results", () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText("Een putt naast de hole");
+    expect(
+      screen.queryByRole("switch", { name: "Ouderdom filter" }),
+    ).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "Instellingen", exact: true }),
+    );
     const toggle = screen.getByRole("switch", { name: "Ouderdom filter" });
     await user.click(toggle);
     expect(
@@ -150,7 +166,21 @@ describe("discovery filters and partial results", () => {
     expect(
       screen.getByLabelText("Maximale leeftijd").matches(":disabled"),
     ).toBe(true);
-    expect(localStorage.getItem("createe-filters:u1")).toContain("age");
+    await user.click(
+      screen.getByRole("button", { name: "Instellingen opslaan" }),
+    );
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        "saveSettings",
+        expect.objectContaining({
+          settings: expect.objectContaining({
+            discoveryFilters: expect.objectContaining({
+              age: { on: false, hours: 24 },
+            }),
+          }),
+        }),
+      ),
+    );
     await user.click(screen.getByRole("button", { name: "Filters resetten" }));
     expect((toggle as HTMLInputElement).checked).toBe(false);
   });
@@ -163,6 +193,7 @@ describe("discovery filters and partial results", () => {
         return {
           posts: [initial],
           connected: true,
+          capabilities: { playfieldSelection: true },
           settings: { categories: ["Golf", "Padel"] },
         };
       if (action === "discover") {
@@ -208,5 +239,90 @@ describe("discovery filters and partial results", () => {
       false,
     );
     vi.restoreAllMocks();
+  });
+});
+
+describe("saved playfield controls selection rather than hiding existing posts", () => {
+  it("runs candidate selection one at a time and preserves results after one candidate fails", async () => {
+    const user = userEvent.setup();
+    mocks.api.mockImplementation(async (action: string) => {
+      if (action === "list")
+        return {
+          posts: [initial],
+          connected: true,
+          capabilities: { playfieldSelection: true },
+          settings: {
+            categories: ["Golf"],
+            discoveryFilters: {
+              categories: { on: true, values: ["Golf"] },
+              age: { on: false, hours: 24 },
+              media: { on: false, values: ["IMAGE"] },
+              hashtags: { on: false, value: "" },
+              keywords: { on: false, include: "", exclude: "" },
+              language: { on: false, value: "nl" },
+              relevance: { on: true, minimum: 95 },
+              engagement: { on: false, minLikes: 0, maxComments: 100 },
+              handled: { on: false },
+              sort: "newest",
+            },
+          },
+        };
+      if (action === "discover")
+        return {
+          imported: 0,
+          candidates: [{ id: "a" }, { id: "b" }],
+          criteria: "saved-filter-stamp",
+        };
+      if (action === "selectCandidate") {
+        const count = mocks.api.mock.calls.filter(
+          (c) => c[0] === "selectCandidate",
+        ).length;
+        if (count === 1) throw new Error("AI quota");
+        return { selected: true, imported: 1 };
+      }
+      return { ok: true };
+    });
+    render(<App />);
+    await screen.findByText("Een putt naast de hole");
+    await user.click(screen.getByRole("button", { name: "Posts ontdekken" }));
+    await screen.findByText(/1 nieuwe posts opgeslagen/);
+    const calls = mocks.api.mock.calls.filter(
+      (c) => c[0] === "selectCandidate",
+    );
+    expect(calls).toHaveLength(2);
+    expect(calls[1][1]).toMatchObject({ criteria: "saved-filter-stamp" });
+    expect(screen.getByText("Een putt naast de hole")).toBeTruthy();
+  });
+});
+
+describe("server upgrade compatibility", () => {
+  it("does not claim to apply playfield criteria against an older server", async () => {
+    mocks.api.mockImplementation(async () => ({
+      posts: [initial],
+      connected: true,
+    }));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText("Een putt naast de hole");
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Posts ontdekken",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    await user.click(
+      screen.getByRole("button", { name: "Instellingen", exact: true }),
+    );
+    expect(
+      screen.getByText(/Supabase-server moet nog worden bijgewerkt/),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Instellingen opslaan",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 });

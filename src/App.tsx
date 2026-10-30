@@ -52,40 +52,16 @@ export default function App() {
     [posts, setPosts] = useState<Post[]>([]),
     [selected, setSelected] = useState<Post | null>(null);
   const [settings, setSettings] = useState<Settings>(defaults),
-    [enabled, setEnabled] = useState(categories),
     [category, setCategory] = useState("Alle categorieën");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterOptions>(
     structuredClone(defaultFilters),
   );
-  const [filterOwner, setFilterOwner] = useState("");
+  const [savedFilters, setSavedFilters] = useState<FilterOptions>(
+    structuredClone(defaultFilters),
+  );
   const [progress, setProgress] = useState("");
-  useEffect(() => {
-    const id = session?.user.id || "";
-    setFilterOwner(id);
-    try {
-      setFilters(
-        parseFilters(
-          id
-            ? JSON.parse(
-                localStorage.getItem("createe-filters:" + id) || "null",
-              )
-            : null,
-        ),
-      );
-    } catch {
-      setFilters(structuredClone(defaultFilters));
-    }
-  }, [session?.user.id]);
-  useEffect(() => {
-    if (filterOwner && filterOwner === session?.user.id)
-      try {
-        localStorage.setItem(
-          "createe-filters:" + filterOwner,
-          JSON.stringify(filters),
-        );
-      } catch {}
-  }, [filters, filterOwner, session?.user.id]);
+  const [selectionReady, setSelectionReady] = useState(false);
   const [link, setLink] = useState(""),
     [caption, setCaption] = useState(""),
     [manualCategory, setManualCategory] = useState("Golf");
@@ -114,9 +90,20 @@ export default function App() {
     if (owner !== activeUser.current) return;
     setPosts(data.posts);
     setConnected(data.connected);
+    setSelectionReady(data.capabilities?.playfieldSelection === true);
+    const loadedFilters = parseFilters(
+      data.settings?.discoveryFilters ?? {
+        ...defaultFilters,
+        categories: {
+          on: true,
+          values: data.settings?.categories || categories,
+        },
+      },
+    );
+    setFilters(loadedFilters);
+    setSavedFilters(loadedFilters);
     if (data.settings) {
       setSettings(data.settings.editor || defaults);
-      setEnabled(data.settings.categories || categories);
     }
   }
   useEffect(() => {
@@ -148,19 +135,20 @@ export default function App() {
     }
   }, []);
   const counts = stats(posts);
-  const filtered = filterPosts(posts, filters).filter(
+  const filtered = filterPosts(posts, {
+    ...defaultFilters,
+    sort: savedFilters.sort,
+  }).filter(
     (p) =>
       (category === "Alle categorieën" || p.category === category) &&
       (p.caption || "").toLowerCase().includes(query.toLowerCase()),
   );
-  const targetCategories = filters.categories.on
-    ? filters.categories.values
-    : category !== "Alle categorieën"
-      ? [category]
-      : enabled;
+  const targetCategories = savedFilters.categories.on
+    ? savedFilters.categories.values
+    : categories;
   async function discover() {
     const owner = session?.user.id;
-    const valid = parseFilters(filters);
+    const valid = parseFilters(savedFilters);
     const tags = valid.hashtags.on ? hashtagsFor(valid, "") : null;
     if (tags && !tags.length)
       throw new Error(
@@ -186,7 +174,24 @@ export default function App() {
             hashtag: job.hashtag,
             filters: valid,
           });
-          imported += data.imported;
+          imported += data.imported || 0;
+          for (let n = 0; n < (data.candidates || []).length; n++) {
+            if (owner !== activeUser.current) break;
+            setProgress(
+              `Selecteren ${n + 1}/${data.candidates.length}: ${job.hashtag || job.category}…`,
+            );
+            try {
+              const choice = await api("selectCandidate", {
+                candidate: data.candidates[n],
+                criteria: data.criteria,
+              });
+              imported += choice.imported || 0;
+            } catch (error) {
+              warnings.push(
+                error instanceof Error ? error.message : "Selectie mislukt",
+              );
+            }
+          }
         } catch (e) {
           warnings.push(
             `${job.hashtag || job.category}: ${e instanceof Error ? e.message : "Aanvraag mislukt"}`,
@@ -594,7 +599,12 @@ export default function App() {
                 </div>
                 <Button
                   variant="outline"
-                  disabled={disabled || !connected || !targetCategories.length}
+                  disabled={
+                    disabled ||
+                    !connected ||
+                    !selectionReady ||
+                    !targetCategories.length
+                  }
                   onClick={() => void run(discover)}
                 >
                   <RefreshCw size={15} /> Posts ontdekken
@@ -624,11 +634,11 @@ export default function App() {
                   </label>
                 </div>
               </div>
-              <DiscoveryFilters
-                value={filters}
-                onChange={setFilters}
-                disabled={busy}
-              />
+              <p className="filter-help">
+                Selectiecriteria stel je in bij Instellingen → Jouw speelveld.
+                Ze bepalen welke nieuwe posts worden opgeslagen; eerder
+                geselecteerde posts blijven in je overzicht.
+              </p>
               {progress && (
                 <p role="status" className="discovery-progress">
                   {progress}
@@ -1023,33 +1033,42 @@ export default function App() {
                   Meta-app.
                 </small>
               </section>
-              <section className="panel">
+              <section className="panel wide">
                 <h2>Jouw speelveld</h2>
-                <p>Selecteer de categorieën die je wilt ontdekken.</p>
-                {categories.map((c) => (
-                  <label className="checkbox" key={c}>
-                    <input
-                      type="checkbox"
-                      checked={enabled.includes(c)}
-                      onChange={(e) =>
-                        setEnabled(
-                          e.target.checked
-                            ? [...enabled, c]
-                            : enabled.filter((x) => x !== c),
-                        )
-                      }
-                    />
-                    {c}
-                  </label>
-                ))}
+                {session && !selectionReady && (
+                  <p role="status">
+                    De Supabase-server moet nog worden bijgewerkt voordat deze
+                    selectiecriteria actief kunnen worden.
+                  </p>
+                )}
+                <p>
+                  Bepaal vooraf welke posts CREATEE selecteert. Datum, type en
+                  caption worden eerst gecontroleerd. Bij een ingeschakeld taal-
+                  of relevantiefilter analyseert AI de overgebleven kandidaten
+                  vóór het opslaan; dit gebruikt OpenAI-tegoed.
+                </p>
+                <DiscoveryFilters
+                  value={filters}
+                  onChange={setFilters}
+                  disabled={busy}
+                />
                 <Button
-                  disabled={disabled}
+                  disabled={disabled || !selectionReady}
                   onClick={() =>
                     void run(async () => {
                       await api("saveSettings", {
-                        settings: { editor: settings, categories: enabled },
+                        settings: {
+                          editor: settings,
+                          categories: filters.categories.on
+                            ? filters.categories.values
+                            : categories,
+                          discoveryFilters: parseFilters(filters),
+                        },
                       });
-                      setNotice("Voorkeuren opgeslagen.");
+                      setSavedFilters(structuredClone(filters));
+                      setNotice(
+                        "Speelveld opgeslagen. Nieuwe zoekopdrachten selecteren posts volgens deze criteria.",
+                      );
                     })
                   }
                 >

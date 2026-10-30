@@ -157,6 +157,37 @@ export function filterPosts(posts: any[], f: FilterOptions, now = Date.now()) {
     );
 }
 
+// One short-lived selection request per candidate avoids a single long AI batch.
+export async function selectForPlayfield(
+  candidate: any,
+  filters: FilterOptions,
+  handled: boolean,
+  analyze: (p: any) => Promise<any>,
+  now = Date.now(),
+) {
+  if (!matchesFilters(candidate, filters, now, true))
+    return { selected: false, analysis: null };
+  if (filters.handled.on && handled) return { selected: false, analysis: null };
+  let analysis = null;
+  if (filters.language.on || filters.relevance.on) {
+    analysis = await analyze(candidate);
+    candidate = {
+      ...candidate,
+      analysis: analysis.analysis,
+      relevance: analysis.relevance,
+      detected_language: analysis.language,
+    };
+  }
+  return {
+    selected: matchesFilters(
+      { ...candidate, drafts: handled ? [{}] : [] },
+      filters,
+      now,
+    ),
+    analysis,
+  };
+}
+
 // Source: schema.ts
 export function draftStatusToDb(status: string) {
   if (!["draft", "approved", "published"].includes(status))
@@ -680,6 +711,95 @@ async function categoryFor(userId: string, name: string) {
       .single(),
   );
 }
+async function playfield(userId: string) {
+  const settings = checked(
+    await db()
+      .from("agent_settings")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle(),
+  );
+  if (settings?.discovery_filters)
+    return parseFilters(settings.discovery_filters);
+  const stored = checked(
+    await db().from("categories").select("name,enabled").eq("user_id", userId),
+  );
+  return parseFilters({
+    ...defaultPlayfield(),
+    categories: {
+      on: true,
+      values: stored?.length
+        ? stored
+            .filter((c: any) => c.enabled)
+            .map((c: any) => c.name)
+            .sort()
+        : Object.keys(categoryTags),
+    },
+  });
+}
+function defaultPlayfield() {
+  return parseFilters(null);
+}
+async function criteriaStamp(filters: any) {
+  return sha(JSON.stringify(filters));
+}
+async function saveCandidate(userId: string, p: any, analysis: any) {
+  const prior = checked(
+    await db()
+      .from("instagram_posts")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("permalink", p.permalink)
+      .maybeSingle(),
+  );
+  const values = {
+    caption: p.caption,
+    published_at: p.timestamp,
+    instagram_post_id: p.instagram_post_id,
+    media_type: p.media_type,
+    media_url: p.media_url,
+    discovery_metadata: {
+      like_count: p.like_count,
+      comments_count: p.comments_count,
+    },
+  };
+  let id = prior?.id;
+  if (id)
+    checked(
+      await db()
+        .from("instagram_posts")
+        .update(values)
+        .eq("user_id", userId)
+        .eq("id", id),
+    );
+  else {
+    id = crypto.randomUUID();
+    const category = await categoryFor(userId, p.category);
+    checked(
+      await db()
+        .from("instagram_posts")
+        .insert({
+          id,
+          user_id: userId,
+          permalink: p.permalink,
+          category_id: category.id,
+          discovered_at: new Date().toISOString(),
+          source: "meta",
+          status: "new",
+          ...values,
+        }),
+    );
+  }
+  if (analysis)
+    checked(
+      await db()
+        .from("post_analyses")
+        .insert(
+          analysisRecord(userId, id, analysis, analysis.hasImage === true),
+        ),
+    );
+  return prior ? 0 : 1;
+}
 async function callback(req: Request) {
   const url = new URL(req.url);
   if (url.searchParams.has("error"))
@@ -843,11 +963,15 @@ Deno.serve(async (req: Request) => {
           await db().from("categories").select("*").eq("user_id", userId),
         ) || [];
       result = {
+        capabilities: { playfieldSelection: true },
         posts: (posts || []).map((p: any) =>
           postView(p, categories, analyses || [], drafts || []),
         ),
         connected: (connection || []).length > 0,
-        settings: settingsView(settings, categories),
+        settings: {
+          ...settingsView(settings, categories),
+          discoveryFilters: await playfield(userId),
+        },
       };
     } else if (action === "addPost") {
       const permalink = postUrl(body.permalink),
@@ -899,6 +1023,13 @@ Deno.serve(async (req: Request) => {
         default_humor_level: body.settings.editor.humor,
         preferred_language: languageToDb(body.settings.editor.language),
         updated_at: new Date().toISOString(),
+        discovery_filters: parseFilters(
+          body.settings.discoveryFilters ??
+            current?.discovery_filters ?? {
+              ...parseFilters(null),
+              categories: { on: true, values: body.settings.categories },
+            },
+        ),
       };
       if (current)
         checked(
@@ -1084,6 +1215,74 @@ Deno.serve(async (req: Request) => {
       checked(
         await db().from("instagram_connections").delete().eq("user_id", userId),
       );
+    } else if (action === "selectCandidate") {
+      const filters = await playfield(userId);
+      if (body.criteria !== (await criteriaStamp(filters)))
+        throw new Error(
+          "Je speelveld is gewijzigd. Start opnieuw met ophalen.",
+        );
+      const input = body.candidate;
+      if (
+        !input ||
+        typeof input.caption !== "string" ||
+        input.caption.length > 10000 ||
+        !["IMAGE", "VIDEO", "CAROUSEL_ALBUM"].includes(input.media_type)
+      )
+        throw new Error("Ongeldige kandidaat.");
+      const p = {
+        permalink: postUrl(input.permalink),
+        caption: input.caption,
+        category: validateCategory(input.category),
+        timestamp: typeof input.timestamp === "string" ? input.timestamp : null,
+        media_type: input.media_type,
+        instagram_post_id:
+          typeof input.instagram_post_id === "string"
+            ? input.instagram_post_id
+            : null,
+        media_url: typeof input.media_url === "string" ? input.media_url : null,
+        like_count:
+          typeof input.like_count === "number" ? input.like_count : null,
+        comments_count:
+          typeof input.comments_count === "number"
+            ? input.comments_count
+            : null,
+      };
+      const existing = checked(
+        await db()
+          .from("instagram_posts")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("permalink", p.permalink)
+          .maybeSingle(),
+      );
+      const handled = existing
+        ? checked(
+            await db()
+              .from("comment_drafts")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("post_id", existing.id)
+              .limit(1),
+          )
+        : [];
+      const decision = await selectForPlayfield(
+        p,
+        filters,
+        !!handled?.length,
+        async (candidate: any) => {
+          const image = await availableImage(candidate);
+          return {
+            ...(await ai(candidate, {}, image, true)),
+            hasImage: !!image,
+          };
+        },
+      );
+      result = {
+        imported: decision.selected
+          ? await saveCandidate(userId, p, decision.analysis)
+          : 0,
+        selected: decision.selected,
+      };
     } else if (action === "discover") {
       if (
         !Array.isArray(body.categories) ||
@@ -1096,7 +1295,7 @@ Deno.serve(async (req: Request) => {
       const selected = [
         ...new Set(body.categories.map(validateCategory)),
       ] as string[];
-      const filters = parseFilters(body.filters);
+      const filters = await playfield(userId);
       const tags = body.hashtag
         ? hashtagsFor(
             parseFilters({
@@ -1109,7 +1308,14 @@ Deno.serve(async (req: Request) => {
       if (tags.length !== 1)
         throw new Error("Haal één hashtag per aanvraag op.");
       const auth = await tokenFor(userId);
-      let imported = 0;
+      if (
+        filters.categories.on &&
+        !filters.categories.values.includes(selected[0])
+      )
+        throw new Error(
+          "Deze categorie staat niet in je opgeslagen speelveld.",
+        );
+      const candidates: any[] = [];
       for (const category of selected) {
         const search = await graph("ig_hashtag_search", auth.token, {
           user_id: auth.instagram_user_id,
@@ -1139,67 +1345,25 @@ Deno.serve(async (req: Request) => {
             (child: any) => child.media_type === "IMAGE",
           );
 
-          const existing = checked(
-            await db()
-              .from("instagram_posts")
-              .select("id")
-              .eq("user_id", userId)
-              .eq("permalink", p.permalink)
-              .maybeSingle(),
-          );
-          if (existing) {
-            checked(
-              await db()
-                .from("instagram_posts")
-                .update({
-                  published_at: p.timestamp,
-                  instagram_post_id: p.id,
-                  media_type: p.media_type,
-                  media_url: firstPhoto?.media_url || p.media_url || null,
-                  discovery_metadata: {
-                    like_count:
-                      typeof p.like_count === "number" ? p.like_count : null,
-                    comments_count:
-                      typeof p.comments_count === "number"
-                        ? p.comments_count
-                        : null,
-                  },
-                })
-                .eq("user_id", userId)
-                .eq("id", existing.id),
-            );
-            continue;
-          }
-          checked(
-            await db()
-              .from("instagram_posts")
-              .insert({
-                user_id: userId,
-                permalink: p.permalink,
-                caption: p.caption || "",
-                id: crypto.randomUUID(),
-                category_id: (await categoryFor(userId, category)).id,
-                instagram_post_id: p.id,
-                published_at: p.timestamp,
-                discovered_at: new Date().toISOString(),
-                status: "new",
-                media_type: p.media_type,
-                media_url: firstPhoto?.media_url || p.media_url || null,
-                discovery_metadata: {
-                  like_count:
-                    typeof p.like_count === "number" ? p.like_count : null,
-                  comments_count:
-                    typeof p.comments_count === "number"
-                      ? p.comments_count
-                      : null,
-                },
-                source: "meta",
-              }),
-          );
-          imported++;
+          candidates.push({
+            permalink: p.permalink,
+            caption: p.caption || "",
+            category,
+            timestamp: p.timestamp || null,
+            media_type: p.media_type,
+            instagram_post_id: p.id,
+            media_url: firstPhoto?.media_url || p.media_url || null,
+            like_count: typeof p.like_count === "number" ? p.like_count : null,
+            comments_count:
+              typeof p.comments_count === "number" ? p.comments_count : null,
+          });
         }
       }
-      result = { imported };
+      result = {
+        imported: 0,
+        candidates,
+        criteria: await criteriaStamp(filters),
+      };
     } else throw new Error("Onbekende actie.");
     return Response.json(result, { headers });
   } catch (error) {

@@ -15,7 +15,7 @@ The backend now maps the real column names to the frontend view:
 | comment_drafts | generated_text preserved; edited_text stored separately; humor_type/humor_level/language |
 | agent_settings | default_humor_level and preferred_language; categories stored in categories.enabled |
 
-Only humor level, language and enabled categories persist as account preferences.
+Humor level, language, enabled categories and the playfield discovery_filters JSON persist as account preferences.
 Style, length and free instructions are per-session editor controls; there are no
 matching account columns in the supplied schema. Every generated draft retains
 its own humor settings and language. Uploaded images are sent for analysis, not
@@ -79,3 +79,15 @@ and post_analyses.detected_language. This migration has NOT been applied by the
 agent and is required before deploying the new server function. It changes no
 existing data or policies. Language classification uses nl/en/other/unknown; legacy
 analyses remain unknown. Counts are optional Meta observations, never inferred.
+
+
+## Playfield selection
+
+`20261030120000_playfield_settings.sql` adds nullable agent_settings.discovery_filters
+and includes missing optional columns from the previous filter migration, with
+existing-type checks. It has not been applied by the agent. Saved criteria are
+loaded server-side; client-supplied filters do not override them. Meta discovery
+returns cheap-filtered candidates without persistence. Each candidate is selected
+in a separate authenticated request; AI language/relevance are checked before
+saveCandidate is called. Rejected new posts are not stored. A criteria fingerprint
+rejects stale requests after settings change. Existing selected posts are retained.

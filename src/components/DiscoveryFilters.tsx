@@ -198,8 +198,8 @@ export default function DiscoveryFilters({
               <option value="en">Engels</option>
             </select>
             <small>
-              Alleen posts die al zijn geanalyseerd. Onbekende taal wordt niet
-              geraden.
+              AI controleert de captiontaal vóór selectie. Onbekende taal
+              voldoet niet.
             </small>
           </label>,
         )}
@@ -220,8 +220,8 @@ export default function DiscoveryFilters({
               }
             />
             <small>
-              Alleen geanalyseerde posts. Filters starten geen betaalde
-              AI-aanvragen.
+              AI beoordeelt kandidaten vóór selectie. Dit gebruikt
+              OpenAI-tegoed.
             </small>
           </label>,
         )}
@@ -298,9 +298,9 @@ export default function DiscoveryFilters({
         </button>
       </div>
       <p className="filter-help">
-        Filters gelden voor opgehaalde posts. Datum en aantallen zijn niet
-        altijd beschikbaar. AI-filters kunnen nieuwe, nog niet geanalyseerde
-        posts verbergen.
+        Deze criteria gelden bij de volgende zoekopdracht na opslaan. Alleen
+        passende kandidaten worden opgeslagen. Ontbrekende vereiste gegevens
+        voldoen niet.
       </p>
     </details>
   );

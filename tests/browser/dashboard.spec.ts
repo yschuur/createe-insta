@@ -17,7 +17,16 @@ test("configuration dashboard works on desktop and mobile without fabricated act
     "0",
     "0",
   ]);
+  await expect(
+    page.getByRole("switch", { name: "Ouderdom filter" }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Instellingen", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Jouw speelveld" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("switch", { name: "Ouderdom filter" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Instagram koppelen" }),
   ).toBeDisabled();

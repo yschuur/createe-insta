@@ -154,3 +154,34 @@ export function filterPosts(posts: any[], f: FilterOptions, now = Date.now()) {
       (a, b) => score(b) - score(a) || String(a.id).localeCompare(String(b.id)),
     );
 }
+
+// One short-lived selection request per candidate avoids a single long AI batch.
+export async function selectForPlayfield(
+  candidate: any,
+  filters: FilterOptions,
+  handled: boolean,
+  analyze: (p: any) => Promise<any>,
+  now = Date.now(),
+) {
+  if (!matchesFilters(candidate, filters, now, true))
+    return { selected: false, analysis: null };
+  if (filters.handled.on && handled) return { selected: false, analysis: null };
+  let analysis = null;
+  if (filters.language.on || filters.relevance.on) {
+    analysis = await analyze(candidate);
+    candidate = {
+      ...candidate,
+      analysis: analysis.analysis,
+      relevance: analysis.relevance,
+      detected_language: analysis.language,
+    };
+  }
+  return {
+    selected: matchesFilters(
+      { ...candidate, drafts: handled ? [{}] : [] },
+      filters,
+      now,
+    ),
+    analysis,
+  };
+}

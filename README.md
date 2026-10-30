@@ -209,7 +209,7 @@ Vercel-variabelen met VITE_-prefix. Roteer de eerder gedeelde Meta-secret.
 Zie [filters activeren](docs/UPDATE-FILTERS.md) voor de ene aanvullende SQL-migratie
 en de vereenvoudigde single-file Edge-deployment. Maak die met `npm run build:edge`;
 de oorspronkelijke TypeScript-types blijven behouden en het exacte deploybestand
-wordt met Deno gecontroleerd. De schakelbare filters starten geen extra AI-aanvragen.
+wordt met Deno gecontroleerd. Bij ingeschakelde taal- of relevantiecriteria analyseert AI kandidaten vóór het opslaan; dit gebruikt OpenAI-tegoed. De criteria staan onder Instellingen → Jouw speelveld en worden per account opgeslagen.
 
 Op expliciet verzoek is ook een [lokale browserpilot](docs/BROWSERPILOT.md) gebouwd
 voor één goedgekeurde reactie per startactie. Dit is geen officiële Meta-route,

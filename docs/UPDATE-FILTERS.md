@@ -1,42 +1,44 @@
-# Filters activeren in de bestaande app
+# Jouw speelveld: selecteren vóór opslaan
 
-1. Open supabase/migrations/20261030110000_discovery_filters.sql op GitHub.
+1. Open supabase/migrations/20261030120000_playfield_settings.sql op GitHub.
    Kopieer de volledige SQL naar Supabase > SQL Editor > New query en Run.
-   Dit voegt alleen twee nullable kolommen toe. Het verandert geen bestaande
-   records of toegangsregels. Voer het bestand één keer uit. Een tweede poging
-   geeft een naamconflict en rolt terug, zonder bestaande kolommen te overschrijven.
+   Deze update voegt ontbrekende filterkolommen toe en bewaart bestaande data,
+   kolommen en toegangsregels. Hij werkt ook als de vorige filterupdate al is gedaan.
+   Onverwachte bestaande kolomtypes geven een fout en volledige rollback.
 2. Open supabase/deploy/agent.ts op GitHub en kies Copy raw file.
-3. Ga naar Supabase > Edge Functions > agent > Code, vervang de volledige inhoud
-   van index.ts door die code en kies Deploy updates. Dit gegenereerde bestand
-   bevat alle helpers; losse schema.ts/validation.ts/discovery.ts zijn dan niet
-   nodig voor de dashboarddeployment. Bestaande losse bestanden mogen blijven staan.
-4. Laat JWT verification zoals eerder uit: de functie verifieert zelf sessies.
-   Alle bestaande secrets blijven staan. Er zijn geen nieuwe secrets nodig.
-5. Vercel bouwt de frontend na de GitHub-push. Vernieuw de app zodra die deployment
-   gereed is. Onder Ontdekken staan nu de schakelbare filters.
+3. Open Supabase > Edge Functions > agent > Code. Vervang index.ts volledig door
+   die code en kies Deploy updates. Alle helpers zitten in dit ene bestand.
+4. Na de Vercel-deployment: ga naar Instellingen > Jouw speelveld, stel de filters
+   in en klik Instellingen opslaan. Nieuwe zoekopdrachten gebruiken alleen de
+   opgeslagen criteria; losse categorie-tabs bepalen de zoekopdracht niet meer.
 
-Filters worden per account in deze browser onthouden, niet tussen apparaten
-uitgewisseld. Standaard staan ze uit om niet onverwacht alle posts te verbergen.
-Wanneer categorie-filter uitstaat worden de categorieën uit Instellingen gebruikt,
-of de geselecteerde categorie-tab. Eigen hashtags worden met hun resultaten aan
-de eerste geselecteerde categorie gekoppeld; dit wordt in de app vermeld.
+De criteria worden per account in agent_settings.discovery_filters bewaard en
+server-side opnieuw geladen. De oude categoriekeuze blijft als beginwaarde
+behouden totdat het nieuwe speelveld is opgeslagen. Onopgeslagen wijzigingen
+veranderen het ontdekken niet. Het overzicht behoudt eerder geselecteerde posts;
+het speelveld dient niet meer als achteraf verbergfilter.
 
-Datum, captionwoorden, media en engagement worden al bij het ophalen toegepast.
-AI-relevantie/taal en eerder behandeld worden op opgeslagen resultaten toegepast.
-Er starten geen extra betaalde analyses door een schakelaar aan te zetten.
-Zet AI-filters tijdelijk uit om nieuwe posts te analyseren. Captiontaal wordt bij
-volgende analyses vastgelegd. Oudere analyses hebben onbekende taal totdat opnieuw
-geanalyseerd. Verborgen aantallen en onbekende publicatiedatums voldoen niet aan
-filters die deze waarden vereisen. Aantallen worden ververst bij opnieuw ophalen.
-De Instagram API bepaalt welke recente media beschikbaar zijn; een 168-uurfilter
-kan geen oudere resultaten afdwingen als Meta die niet levert. Er wordt niet verder
-gepagineerd dan de eerste 25 resultaten per hashtag in deze versie.
+## Selectieproces
 
-De app doet één categorie/hashtag per serveraanvraag. Voortgang en losse fouten
-zijn zichtbaar; de volgende aanvraag gaat verder na een fout. Nieuwe resultaten
-worden na iedere stap opnieuw geladen. Eerdere resultaten worden niet verwijderd.
-Een unieke postlink voorkomt dubbele posts, ook bij opnieuw ophalen.
+- Per categorie/hashtag haalt de functie maximaal 25 recente kandidaten op.
+- Datum, media, trefwoorden, hashtags en engagement worden eerst gecontroleerd.
+- De browser vraagt daarna één selectie per kandidaat aan. Zo ontstaat geen lange
+  serveraanvraag met 25 AI-analyses achter elkaar. Voortgang en losse fouten zijn zichtbaar.
+- Bij 'eerder behandeld verbergen' worden posts met een bestaande reactie vóór AI
+  overgeslagen. Als taal of relevantie aanstaat, voert de server beeld-/captionanalyse
+  uit voor kandidaten die de goedkope criteria doorstaan. Dit gebruikt OpenAI-tegoed.
+- Alleen als alle actieve criteria passen, wordt de post opgeslagen of bijgewerkt.
+  De selectieanalyse wordt mee opgeslagen. Afgewezen nieuwe kandidaten worden
+  niet als instagram_posts opgeslagen en er worden geen reacties voor gegenereerd.
+- Als AI faalt, wordt de kandidaat niet toegelaten; de app meldt de fout en gaat
+  verder met de andere kandidaten. Bestaande resultaten worden niet verwijderd.
+- Als de opgeslagen criteria tijdens een zoekopdracht wijzigen, worden oude
+  selectieaanvragen geweigerd met de instructie opnieuw te zoeken.
 
-Voor de optionele browserpilot: docs/BROWSERPILOT.md. 'Kopiëren en openen' blijft
-beschikbaar voor de handmatige workflow. Geen van beide knoppen registreert
-zelfstandig een succesvolle Instagram-publicatie.
+Onbekende vereiste aantallen, publicatiedatum of taal voldoen niet. Alle Meta-
+beperkingen op recente media en unieke hashtags blijven gelden. Er is geen extra
+paginatie buiten de eerste 25 resultaten. Eigen hashtags worden onder de eerste
+gekozen categorie opgeslagen. Handmatig ingevoerde posts zijn een bewuste invoer
+van de gebruiker en vallen buiten deze automatische selectie.
+
+De browserpilot en handmatige publicatie zijn niet gewijzigd; zie BROWSERPILOT.md.
