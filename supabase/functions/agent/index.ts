@@ -10,6 +10,7 @@ import {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   categoryTags,
+  metaErrorMessage,
   editor,
   postUrl,
   validateCategory,
@@ -66,9 +67,7 @@ async function graph(
   });
   const body = await res.json();
   if (!res.ok || body.error)
-    throw new Error(
-      `Meta API-fout ${body.error?.code || res.status}: controleer permissies, token en API-versie.`,
-    );
+    throw new Error(metaErrorMessage(path, res.status, body.error, token));
   return body;
 }
 async function sha(value: string) {

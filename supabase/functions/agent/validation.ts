@@ -38,3 +38,37 @@ export function validateCategory(value: unknown): string {
     throw new Error("Ongeldige categorie.");
   return value;
 }
+
+// Preserve useful Meta diagnostics without exposing credentials or full responses.
+export function metaErrorMessage(
+  path: string,
+  httpStatus: number,
+  error: any,
+  token: string,
+) {
+  const stage =
+    path === "ig_hashtag_search"
+      ? "hashtag zoeken"
+      : path.endsWith("/recent_media")
+        ? "recente posts ophalen"
+        : "account ophalen";
+  const code = Number.isInteger(error?.code) ? error.code : httpStatus;
+  const subcode = Number.isInteger(error?.error_subcode)
+    ? `/${error.error_subcode}`
+    : "";
+  let detail =
+    typeof error?.message === "string"
+      ? error.message
+      : "Meta heeft de aanvraag geweigerd.";
+  for (const secret of [token, encodeURIComponent(token)])
+    if (secret) detail = detail.split(secret).join("[afgeschermd]");
+  detail = detail
+    .replace(
+      /access_token\s*[=:]\s*[^\s&"'<>]+/gi,
+      "access_token=[afgeschermd]",
+    )
+    .replace(/Bearer\s+[^\s"'<>]+/gi, "Bearer [afgeschermd]")
+    .replace(/[\r\n\t]+/g, " ")
+    .slice(0, 600);
+  return `Meta-fout bij ${stage} (${code}${subcode}): ${detail}`;
+}
