@@ -1,0 +1,59 @@
+table_name,column_name,data_type,is_nullable
+agent_settings,id,uuid,NO
+agent_settings,user_id,uuid,NO
+agent_settings,max_post_age_hours,integer,NO
+agent_settings,minimum_relevance_score,integer,NO
+agent_settings,max_results,integer,NO
+agent_settings,preferred_language,text,NO
+agent_settings,default_humor_level,integer,NO
+agent_settings,updated_at,timestamp with time zone,NO
+categories,id,uuid,NO
+categories,user_id,uuid,NO
+categories,name,text,NO
+categories,enabled,boolean,NO
+categories,hashtags,ARRAY,NO
+categories,target_accounts,ARRAY,NO
+categories,created_at,timestamp with time zone,NO
+comment_drafts,id,uuid,NO
+comment_drafts,user_id,uuid,NO
+comment_drafts,post_id,uuid,NO
+comment_drafts,generated_text,text,NO
+comment_drafts,edited_text,text,YES
+comment_drafts,humor_level,integer,NO
+comment_drafts,humor_type,text,NO
+comment_drafts,language,text,NO
+comment_drafts,status,text,NO
+comment_drafts,created_at,timestamp with time zone,NO
+comment_drafts,updated_at,timestamp with time zone,NO
+instagram_connections,id,uuid,NO
+instagram_connections,user_id,uuid,NO
+instagram_connections,instagram_account_id,text,NO
+instagram_connections,username,text,NO
+instagram_connections,profile_picture_url,text,YES
+instagram_connections,token_secret_id,uuid,YES
+instagram_connections,token_expires_at,timestamp with time zone,YES
+instagram_connections,created_at,timestamp with time zone,NO
+instagram_posts,id,uuid,NO
+instagram_posts,user_id,uuid,NO
+instagram_posts,category_id,uuid,YES
+instagram_posts,instagram_post_id,text,YES
+instagram_posts,permalink,text,NO
+instagram_posts,username,text,YES
+instagram_posts,caption,text,YES
+instagram_posts,media_type,text,NO
+instagram_posts,media_url,text,YES
+instagram_posts,thumbnail_url,text,YES
+instagram_posts,published_at,timestamp with time zone,YES
+instagram_posts,discovered_at,timestamp with time zone,NO
+instagram_posts,source,text,NO
+instagram_posts,status,text,NO
+post_analyses,id,uuid,NO
+post_analyses,user_id,uuid,NO
+post_analyses,post_id,uuid,NO
+post_analyses,summary,text,YES
+post_analyses,detected_topic,text,YES
+post_analyses,relevance_score,integer,YES
+post_analyses,humorous_angles,jsonb,NO
+post_analyses,analysis_sources,ARRAY,NO
+post_analyses,analysis_limitations,text,YES
+post_analyses,created_at,timestamp with time zone,NO

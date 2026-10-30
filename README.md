@@ -7,13 +7,12 @@ Supabase Edge Function voor OpenAI en officiële Meta-API-aanvragen.
 ## Status en grenzen
 
 De frontend is gebouwd. De workflow kan lokaal worden gestart en met gemockte
-providers worden getest. **De live integratie is nog niet geverifieerd**: het
-bestaande Supabase-schema is niet beschikbaar en toegang tot het project vanuit
+providers worden getest. **De live integratie is nog niet geverifieerd**: de
+kolommen zijn op basis van de aangeleverde CSV verwerkt, maar constraints en policies zijn nog niet gecontroleerd en toegang tot het project vanuit
 de cloudomgeving werd door de proxy geweigerd. Er zijn geen bestaande tabellen
 aangemaakt of gewijzigd, geen functies gedeployed en geen secrets opgeslagen.
 
-De backend bevat een expliciet, voorlopig databasecontract. Dit moet eerst aan het
-bestaande schema worden aangepast. Voer niet blind een nieuwe basismigratie uit.
+De backend is aangepast aan de bestaande kolommen. Constraints, policies en defaults moeten nog worden gecontroleerd met `supabase/schema/check-access.sql`. Voer niet blind een nieuwe basismigratie uit.
 Zie [het contract](supabase/schema/CONTRACT.md).
 
 ## Lokaal starten

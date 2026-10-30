@@ -1,3 +1,4 @@
+import { draftView, postView, settingsView, analysisRecord } from "./schema.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   categoryTags,
@@ -282,6 +283,65 @@ async function availableImage(post: any) {
     binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return `data:${mime};base64,${btoa(binary)}`;
 }
+async function saveUserRecord(
+  table: string,
+  userId: string,
+  values: Record<string, unknown>,
+) {
+  const rows = checked(
+    await db().from(table).select("id").eq("user_id", userId).limit(2),
+  );
+  if ((rows || []).length > 1)
+    throw new Error(
+      `Meerdere ${table}-records voor deze gebruiker; controleer constraints.`,
+    );
+  if (rows?.[0])
+    return checked(
+      await db()
+        .from(table)
+        .update(values)
+        .eq("user_id", userId)
+        .eq("id", rows[0].id),
+    );
+  return checked(
+    await db()
+      .from(table)
+      .insert({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        created_at: new Date().toISOString(),
+        ...values,
+      }),
+  );
+}
+async function categoryFor(userId: string, name: string) {
+  const rows = checked(
+    await db()
+      .from("categories")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("name", name)
+      .limit(2),
+  );
+  if ((rows || []).length > 1)
+    throw new Error("Dubbele categorie gevonden; controleer unieke sleutels.");
+  if (rows?.[0]) return rows[0];
+  return checked(
+    await db()
+      .from("categories")
+      .insert({
+        id: crypto.randomUUID(),
+        user_id: userId,
+        name,
+        enabled: true,
+        hashtags: [categoryTags[name]],
+        target_accounts: [],
+        created_at: new Date().toISOString(),
+      })
+      .select("*")
+      .single(),
+  );
+}
 async function callback(req: Request) {
   const url = new URL(req.url);
   if (url.searchParams.has("error"))
@@ -357,19 +417,13 @@ async function callback(req: Request) {
         { onConflict: "user_id" },
       ),
   );
-  checked(
-    await db()
-      .from("instagram_connections")
-      .upsert(
-        {
-          user_id: row.user_id,
-          instagram_user_id: ig.id,
-          username: ig.username,
-          page_id: p.id,
-        },
-        { onConflict: "user_id" },
-      ),
-  );
+  await saveUserRecord("instagram_connections", row.user_id, {
+    instagram_account_id: ig.id,
+    username: ig.username,
+    token_expires_at: new Date(
+      Date.now() + Number(long.expires_in || 3600) * 1000,
+    ).toISOString(),
+  });
   return Response.redirect(`${appUrl()}/?instagram=connected`, 303);
 }
 Deno.serve(async (req: Request) => {
@@ -415,68 +469,79 @@ Deno.serve(async (req: Request) => {
           .from("instagram_posts")
           .select("*")
           .eq("user_id", userId)
-          .order("timestamp", { ascending: false, nullsFirst: false })
+          .order("published_at", { ascending: false, nullsFirst: false })
           .limit(200),
       );
       const analyses = checked(
         await db()
           .from("post_analyses")
-          .select("post_id,analysis")
+          .select("post_id,summary,relevance_score")
           .eq("user_id", userId)
           .order("created_at", { ascending: false }),
       );
       const drafts = checked(
         await db()
           .from("comment_drafts")
-          .select("id,post_id,text,style,status")
+          .select("id,post_id,generated_text,edited_text,humor_type,status")
           .eq("user_id", userId)
           .order("created_at", { ascending: true }),
       );
       const connection = checked(
         await db()
           .from("instagram_connections")
-          .select("instagram_user_id")
+          .select("instagram_account_id")
           .eq("user_id", userId)
           .limit(1),
       );
       const settings = checked(
         await db()
           .from("agent_settings")
-          .select("settings")
+          .select("*")
           .eq("user_id", userId)
           .maybeSingle(),
       );
+      const categories =
+        checked(
+          await db().from("categories").select("*").eq("user_id", userId),
+        ) || [];
       result = {
-        posts: (posts || []).map((p: any) => ({
-          ...p,
-          analysis: (analyses || []).find((a: any) => a.post_id === p.id)
-            ?.analysis,
-          drafts: (drafts || []).filter((d: any) => d.post_id === p.id),
-        })),
+        posts: (posts || []).map((p: any) =>
+          postView(p, categories, analyses || [], drafts || []),
+        ),
         connected: (connection || []).length > 0,
-        settings: settings?.settings,
+        settings: settingsView(settings, categories),
       };
     } else if (action === "addPost") {
       const permalink = postUrl(body.permalink),
         category = validateCategory(body.category);
       if (typeof body.caption !== "string" || body.caption.length > 10000)
         throw new Error("Caption te lang.");
-      // A manual link does not establish a publication timestamp.
+      const existing = checked(
+        await db()
+          .from("instagram_posts")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("permalink", permalink)
+          .limit(1),
+      );
+      if (existing?.length)
+        throw new Error("Deze post staat al in je werkplek.");
+      const categoryRow = await categoryFor(userId, category);
       result = checked(
         await db()
           .from("instagram_posts")
-          .upsert(
-            {
-              user_id: userId,
-              permalink,
-              caption: body.caption,
-              category,
-              timestamp: null,
-              source: "manual",
-              relevance: 0,
-            },
-            { onConflict: "user_id,permalink" },
-          )
+          .insert({
+            id: crypto.randomUUID(),
+            user_id: userId,
+            permalink,
+            caption: body.caption,
+            category_id: categoryRow.id,
+            published_at: null,
+            discovered_at: new Date().toISOString(),
+            source: "manual",
+            media_type: permalink.includes("/reel/") ? "VIDEO" : "IMAGE",
+            status: "discovered",
+          })
           .select()
           .single(),
       );
@@ -485,14 +550,49 @@ Deno.serve(async (req: Request) => {
       if (!Array.isArray(body.settings.categories))
         throw new Error("Categorieën ontbreken.");
       body.settings.categories.forEach(validateCategory);
-      checked(
+      const current = checked(
         await db()
           .from("agent_settings")
-          .upsert(
-            { user_id: userId, settings: body.settings },
-            { onConflict: "user_id" },
-          ),
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle(),
       );
+      const values = {
+        default_humor_level: body.settings.editor.humor,
+        preferred_language: body.settings.editor.language,
+        updated_at: new Date().toISOString(),
+      };
+      if (current)
+        checked(
+          await db()
+            .from("agent_settings")
+            .update(values)
+            .eq("user_id", userId)
+            .eq("id", current.id),
+        );
+      else
+        checked(
+          await db()
+            .from("agent_settings")
+            .insert({
+              id: crypto.randomUUID(),
+              user_id: userId,
+              max_post_age_hours: 168,
+              minimum_relevance_score: 0,
+              max_results: 25,
+              ...values,
+            }),
+        );
+      for (const name of Object.keys(categoryTags)) {
+        const category = await categoryFor(userId, name);
+        checked(
+          await db()
+            .from("categories")
+            .update({ enabled: body.settings.categories.includes(name) })
+            .eq("user_id", userId)
+            .eq("id", category.id),
+        );
+      }
     } else if (action === "saveDraft") {
       if (
         !["draft", "approved", "published"].includes(body.status) ||
@@ -514,7 +614,11 @@ Deno.serve(async (req: Request) => {
       checked(
         await db()
           .from("comment_drafts")
-          .update({ text: body.text, status: body.status })
+          .update({
+            edited_text: body.text,
+            status: body.status,
+            updated_at: new Date().toISOString(),
+          })
           .eq("user_id", userId)
           .eq("id", body.id)
           .select("id")
@@ -526,13 +630,24 @@ Deno.serve(async (req: Request) => {
       const previous = checked(
         await db()
           .from("post_analyses")
-          .select("analysis")
+          .select("summary")
           .eq("user_id", userId)
           .eq("post_id", post.id)
           .order("created_at", { ascending: false })
           .limit(1),
       );
-      post.analysis = previous?.[0]?.analysis;
+      post.analysis = previous?.[0]?.summary;
+      if (post.category_id) {
+        const category = checked(
+          await db()
+            .from("categories")
+            .select("name")
+            .eq("user_id", userId)
+            .eq("id", post.category_id)
+            .maybeSingle(),
+        );
+        post.category = category?.name;
+      }
       if (action === "analyze" && typeof body.image !== "string")
         throw new Error("Upload een beschikbare foto of videoframe.");
       const image =
@@ -541,18 +656,7 @@ Deno.serve(async (req: Request) => {
       checked(
         await db()
           .from("post_analyses")
-          .insert({
-            user_id: userId,
-            post_id: post.id,
-            analysis: data.analysis,
-          }),
-      );
-      checked(
-        await db()
-          .from("instagram_posts")
-          .update({ relevance: data.relevance })
-          .eq("id", post.id)
-          .eq("user_id", userId),
+          .insert(analysisRecord(userId, post.id, data, !!image)),
       );
       let drafts: any[] = [];
       if (action === "generate")
@@ -564,14 +668,20 @@ Deno.serve(async (req: Request) => {
                 data.comments.map((c: any) => ({
                   user_id: userId,
                   post_id: post.id,
-                  text: c.text,
-                  style: c.style,
+                  id: crypto.randomUUID(),
+                  generated_text: c.text,
+                  edited_text: null,
+                  humor_level: settings.humor,
+                  humor_type: c.style,
+                  language: settings.language,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
                   status: "draft",
                 })),
               )
-              .select("id,text,style,status"),
+              .select("id,generated_text,edited_text,humor_type,status"),
           ) || [];
-      result = { analysis: data.analysis, drafts };
+      result = { analysis: data.analysis, drafts: drafts.map(draftView) };
     } else if (action === "oauthStart") {
       const state = b64(crypto.getRandomValues(new Uint8Array(32)))
         .replace(/\+/g, "-")
@@ -658,12 +768,15 @@ Deno.serve(async (req: Request) => {
                 user_id: userId,
                 permalink: p.permalink,
                 caption: p.caption || "",
-                category,
-                timestamp: p.timestamp,
+                id: crypto.randomUUID(),
+                category_id: (await categoryFor(userId, category)).id,
+                instagram_post_id: p.id,
+                published_at: p.timestamp,
+                discovered_at: new Date().toISOString(),
+                status: "discovered",
                 media_type: p.media_type,
                 media_url: firstPhoto?.media_url || p.media_url || null,
                 source: "meta",
-                relevance: 0,
               }),
           );
           imported++;

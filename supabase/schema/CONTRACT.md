@@ -1,47 +1,65 @@
-# Pending schema inspection — do not create or alter existing tables yet
+# Existing schema adapter
 
-No database migration has been applied. Run `inspect.sql` first. The Edge Function
-currently expects the following contract. This is a provisional adapter contract,
-not a claim about the user's actual schema. Adapt the function to the inspection
-results before deploying against production. Do not rename existing data blindly.
+The user supplied `tests/fixtures/supabase-columns.csv`. All six existing tables
+have RLS enabled according to the supplied screenshot. No database migrations have
+been run and existing tables have not been changed.
 
-Every application table needs `user_id uuid` referencing auth.users. Every user-
-owned query is scoped to the verified JWT user inside the server. Verify RLS as
-well, because the public Supabase API remains independently accessible.
+The backend now maps the real column names to the frontend view:
 
-| Existing table | Fields used by the adapter | Constraints expected |
-| --- | --- | --- |
-| instagram_connections | user_id, instagram_user_id text, username text, page_id text | unique(user_id) |
-| categories | Not written; five initial category names are selected via agent_settings | Inspect existing records before mapping category strings/IDs |
-| instagram_posts | id uuid default, user_id, permalink text, caption text, category text, timestamp timestamptz nullable, media_type text nullable, media_url text nullable, thumbnail_url text nullable, source text, relevance integer | unique(user_id,permalink) |
-| post_analyses | id default, user_id, post_id uuid, analysis text, created_at default now() | ownership-preserving FK to posts |
-| comment_drafts | id uuid default, user_id, post_id uuid, text text, style text, status text, created_at default now() | status draft/approved/published, ownership-preserving FK |
-| agent_settings | user_id, settings jsonb | unique(user_id) |
+| Table | Mapping |
+| --- | --- |
+| instagram_connections | instagram_account_id (not instagram_user_id); no page_id column |
+| categories | per-user name/enabled/hashtags/target_accounts; posts reference category UUID |
+| instagram_posts | category_id, published_at, discovered_at; relevance lives in analyses |
+| post_analyses | summary, relevance_score, humorous_angles, analysis_sources, analysis_limitations |
+| comment_drafts | generated_text preserved; edited_text stored separately; humor_type/humor_level/language |
+| agent_settings | default_humor_level and preferred_language; categories stored in categories.enabled |
 
-Manually entered links have unknown publication dates (`timestamp = null`).
-Filters on publication dates omit these posts. Official discovery provides actual
-timestamps. `relevance = 0` means not analyzed; it is not an AI judgment.
+Only humor level, language and enabled categories persist as account preferences.
+Style, length and free instructions are per-session editor controls; there are no
+matching account columns in the supplied schema. Every generated draft retains
+its own humor settings and language. Uploaded images are sent for analysis, not
+persisted as media in the database.
 
-Two NEW server-only tables are required for OAuth. They are deliberately not
-created by this MVP until the existing schema and policies have been inspected:
+## Remaining verification before live deployment
 
-- `createe_oauth_states(state_hash text primary key, user_id uuid, expires_at timestamptz)`
-- `createe_token_vault(user_id uuid primary key, encrypted_token text, instagram_user_id text, expires_at timestamptz)`
+Run `check-access.sql` in SQL Editor and export its single result table as CSV.
+It reads only constraint definitions, policies and column defaults. It reads no
+application data or secrets. Column types alone do not reveal allowed status,
+humor_type, source or language values, defaults, unique keys or policy behavior.
 
-Use foreign keys to auth.users with ON DELETE CASCADE. Enable RLS, grant **no**
-access to anon/authenticated (including select), and grant access only to
-service_role. Never put tokens in browser-readable instagram_connections fields.
-The function encrypts tokens using AES-256-GCM and stores only hashed, expiring,
-single-use OAuth states. Schedule deletion of expired states. OAuth is not usable
-until these tables are securely provisioned after inspection.
+Current writes use draft/approved/published for comments, discovered for posts,
+manual/meta for sources, Speels/Sarcastisch/Woordgrap for humor type and
+Nederlands/Engels for language. Check these against actual constraints before
+using live writes. Never remove a constraint just to make an insert pass.
 
-For existing tables, grant authenticated users access only to rows where
-`auth.uid() = user_id`, using both USING and WITH CHECK. Ensure a user cannot link
-an analysis/draft to another user's post. Review any existing token columns:
-remove public access and migrate existing credentials through a separate reviewed
-migration before exposing the frontend.
+User-keyed settings and connections explicitly look up existing IDs before
+updates, without assuming unique(user_id). Category resolution is also scoped to
+the user. Duplicate existing rows trigger an error. Check actual uniqueness before
+production concurrency; select-then-insert does not itself prevent races.
 
-Generation currently makes several separate writes (not a single DB transaction).
-A provider failure leaves existing comments intact. A database failure after AI
-completion can leave an analysis without drafts. Add a reviewed transaction RPC
-and durable per-user quota before public, multi-user production use.
+Every request verifies JWT identity and every query is scoped to that user.
+Existing public API access still needs correct RLS USING and WITH CHECK policies.
+Ensure a draft or analysis cannot reference another user's post. RLS being enabled
+alone does not demonstrate correct authorization.
+
+## OAuth storage is still pending
+
+The existing token_secret_id UUID column may reference an existing vault; inspect
+its foreign key before deciding how tokens should be stored. No secrets have
+been read. The current code still expects two additional server-only tables:
+
+- createe_oauth_states(state_hash text primary key, user_id uuid, expires_at timestamptz)
+- createe_token_vault(user_id uuid primary key, encrypted_token text, instagram_user_id text, expires_at timestamptz)
+
+These have NOT been created. Do not provision redundant token storage until the
+existing constraints/vault integration are understood. If this storage is used,
+enable RLS, deny anon/authenticated access and grant only service_role, with
+foreign keys to auth.users. Tokens are AES-256-GCM encrypted by the function;
+OAuth state is hashed, expiring and atomically consumed. OAuth remains blocked
+until storage is securely configured.
+
+Generation currently makes separate writes. A database failure after AI
+completion may leave an analysis without drafts. Add a reviewed transaction RPC
+and per-user quota before public multi-user use. Live integration has not yet
+been validated.
