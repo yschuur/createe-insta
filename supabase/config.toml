@@ -1,0 +1,5 @@
+project_id = "createe-comment-agent"
+
+[functions.agent]
+# OAuth callback is public; every other action verifies its JWT inside the function.
+verify_jwt = false
